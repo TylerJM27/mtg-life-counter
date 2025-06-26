@@ -2,3 +2,21 @@
     font-family: sans-serif;
     text-align: center;
 }
+
+:root {
+    --vh: 1vh;
+}
+
+html,
+body {
+    height: 100%;
+    margin: 0;
+    padding: 0;
+}
+
+/* Apply actual viewport height accounting for mobile UI */
+.full-viewport {
+    height: 100dvh;
+    max-height: 100dvh;
+    overflow: hidden;
+}
