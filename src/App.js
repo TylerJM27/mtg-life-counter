@@ -17,6 +17,7 @@ const PlayerBox = ({
     index,
     showCommanderDamage,
     setShowCommanderDamage,
+    openCommanderSearch,
 }) => {
     const {
         updateLife,
@@ -28,10 +29,6 @@ const PlayerBox = ({
     } = useGame();
     const [showPoisonModal, setShowPoisonModal] = useState(false);
     const [showColorPicker, setShowColorPicker] = useState(false);
-    const [showCommanderSearch, setShowCommanderSearch] = useState(false);
-    const [commanderSearch, setCommanderSearch] = useState("");
-    const [searchResults, setSearchResults] = useState([]);
-    const [isSearching, setIsSearching] = useState(false);
 
     // Calculate total commander damage for death condition
     const hasTaken21FromOneCommander = Object.values(
@@ -40,43 +37,6 @@ const PlayerBox = ({
 
     const isDead =
         player.life <= 0 || player.poison >= 10 || hasTaken21FromOneCommander;
-
-    // Search for commanders using Scryfall API
-    const searchCommanders = useCallback(async (query) => {
-        if (!query.trim()) {
-            setSearchResults([]);
-            return;
-        }
-
-        setIsSearching(true);
-        try {
-            const response = await fetch(
-                `https://api.scryfall.com/cards/search?q=${encodeURIComponent(
-                    query
-                )}+type:legendary+type:creature&order=name`
-            );
-            const data = await response.json();
-
-            if (data.data) {
-                setSearchResults(data.data.slice(0, 10)); // Limit to 10 results
-            } else {
-                setSearchResults([]);
-            }
-        } catch (error) {
-            console.error("Error searching commanders:", error);
-            setSearchResults([]);
-        }
-        setIsSearching(false);
-    }, []);
-
-    // Debounced search
-    useEffect(() => {
-        const timer = setTimeout(() => {
-            searchCommanders(commanderSearch);
-        }, 300);
-
-        return () => clearTimeout(timer);
-    }, [commanderSearch, searchCommanders]);
 
     const statusIcons = [
         {
@@ -167,6 +127,9 @@ const PlayerBox = ({
                         >
                             +
                         </button>
+                        <span className="font-mtg text-lg text-red-400">
+                            Total Life: {player.life}
+                        </span>
                     </div>
                 </div>
             </div>
@@ -275,19 +238,18 @@ const PlayerBox = ({
                                 onClick={() =>
                                     updateLife(index, player.life - 1)
                                 }
-                                className="text-4xl text-white drop-shadow-lg"
+                                className="text-4xl text-white drop-shadow-lg p-4 md:p-8" // Added p-4 for larger hit area
                             >
                                 -
                             </button>
                             <span className="text-5xl sm:text-7xl font-bold font-mtg text-white drop-shadow-lg">
                                 {player.life}
                             </span>
-
                             <button
                                 onClick={() =>
                                     updateLife(index, player.life + 1)
                                 }
-                                className="text-4xl text-white drop-shadow-lg"
+                                className="text-4xl text-white drop-shadow-lg p-4 md:p-8" // Added p-4
                             >
                                 +
                             </button>
@@ -301,9 +263,13 @@ const PlayerBox = ({
                                             setShowPoisonModal(true);
                                         else if (key === "commander")
                                             setShowCommanderDamage(index);
-                                        else if (key === "search")
-                                            setShowCommanderSearch(true);
-                                        else toggleStatus(index, key);
+                                        else if (key === "search") {
+                                            console.log(
+                                                "Opening commander search modal for player",
+                                                index
+                                            );
+                                            openCommanderSearch(index);
+                                        } else toggleStatus(index, key);
                                     }}
                                     className="relative group"
                                     title={title}
@@ -325,81 +291,6 @@ const PlayerBox = ({
                     </>
                 )}
             </div>
-
-            {/* Commander Search Modal */}
-            {showCommanderSearch && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center animate-fade-in z-50">
-                    <div className="bg-gray-800 p-6 rounded-xl w-96 max-h-96 overflow-hidden flex flex-col">
-                        <div className="flex justify-between items-center mb-4">
-                            <h3 className="font-mtg text-xl text-white">
-                                Search Commander
-                            </h3>
-                            <button
-                                onClick={() => {
-                                    setShowCommanderSearch(false);
-                                    setCommanderSearch("");
-                                    setSearchResults([]);
-                                }}
-                                className="text-white text-xl"
-                            >
-                                <i className="fas fa-times" />
-                            </button>
-                        </div>
-
-                        <input
-                            type="text"
-                            value={commanderSearch}
-                            onChange={(e) => setCommanderSearch(e.target.value)}
-                            placeholder="Search Commander..."
-                            className="w-full p-3 rounded-lg bg-gray-700 text-white mb-4"
-                            autoFocus
-                        />
-
-                        <div className="flex-1 overflow-y-auto">
-                            {isSearching ? (
-                                <div className="text-center text-white">
-                                    Searching...
-                                </div>
-                            ) : searchResults.length > 0 ? (
-                                <div className="space-y-2">
-                                    {searchResults.map((card) => (
-                                        <button
-                                            key={card.id}
-                                            onClick={() => {
-                                                updateCommander(index, card);
-                                                setShowCommanderSearch(false);
-                                                setCommanderSearch("");
-                                                setSearchResults([]);
-                                            }}
-                                            className="w-full p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-left text-white flex items-center gap-3"
-                                        >
-                                            {card.image_uris?.small && (
-                                                <img
-                                                    src={card.image_uris.small}
-                                                    alt={card.name}
-                                                    className="w-12 h-12 rounded object-cover"
-                                                />
-                                            )}
-                                            <div>
-                                                <div className="font-mtg">
-                                                    {card.name}
-                                                </div>
-                                                <div className="text-sm text-gray-300">
-                                                    {card.type_line}
-                                                </div>
-                                            </div>
-                                        </button>
-                                    ))}
-                                </div>
-                            ) : commanderSearch && !isSearching ? (
-                                <div className="text-center text-gray-400">
-                                    No results found
-                                </div>
-                            ) : null}
-                        </div>
-                    </div>
-                </div>
-            )}
 
             {/* Poison Modal */}
             {showPoisonModal && (
@@ -447,10 +338,43 @@ const App = () => {
     const [showCommanderDamage, setShowCommanderDamage] = useState(null);
     const [darkMode, setDarkMode] = useState(false);
     const [winner, setWinner] = useState(null);
+    const [showResetConfirm, setShowResetConfirm] = useState(false);
+    const [showCommanderSearch, setShowCommanderSearch] = useState(null); // use index
+    const [commanderSearch, setCommanderSearch] = useState("");
+    const [searchResults, setSearchResults] = useState([]);
+    const [isSearching, setIsSearching] = useState(false);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            if (!commanderSearch.trim()) {
+                setSearchResults([]);
+                return;
+            }
+
+            setIsSearching(true);
+            fetch(
+                `https://api.scryfall.com/cards/search?q=${encodeURIComponent(
+                    commanderSearch
+                )}+type:legendary+type:creature&order=name`
+            )
+                .then((res) => res.json())
+                .then((data) => {
+                    if (data.data) {
+                        setSearchResults(data.data.slice(0, 10));
+                    } else {
+                        setSearchResults([]);
+                    }
+                })
+                .catch(() => setSearchResults([]))
+                .finally(() => setIsSearching(false));
+        }, 300);
+
+        return () => clearTimeout(timer);
+    }, [commanderSearch]);
 
     // Check for winner
     useEffect(() => {
-        if (!gameState) return;
+        if (!gameState || gameState.players.length === 1) return; // Skip for 1 player
 
         const alivePlayers = gameState.players.filter((player, index) => {
             const hasTaken21FromOneCommander = Object.values(
@@ -538,20 +462,34 @@ const App = () => {
                     ),
                 })),
             updateCommanderDamage: (index, fromPlayer, damage) =>
-                setGameState((prev) => ({
-                    ...prev,
-                    players: prev.players.map((p, i) =>
-                        i === index
-                            ? {
-                                  ...p,
-                                  commanderDamage: {
-                                      ...p.commanderDamage,
-                                      [fromPlayer]: Math.max(0, damage),
-                                  },
-                              }
-                            : p
-                    ),
-                })),
+                setGameState((prev) => {
+                    const updatedPlayers = prev.players.map((p, i) => {
+                        if (i !== index) return p;
+
+                        const current = p.commanderDamage[fromPlayer] || 0;
+                        const clamped = Math.max(0, damage);
+
+                        // If already at 0 and trying to subtract, ignore
+                        if (current === 0 && damage < 0) return p;
+
+                        const newLife = p.life - (clamped - current);
+
+                        return {
+                            ...p,
+                            commanderDamage: {
+                                ...p.commanderDamage,
+                                [fromPlayer]: clamped,
+                            },
+                            life: newLife,
+                        };
+                    });
+
+                    return {
+                        ...prev,
+                        players: updatedPlayers,
+                    };
+                }),
+
             updateCommander: (index, commander) =>
                 setGameState((prev) => ({
                     ...prev,
@@ -777,12 +715,14 @@ const App = () => {
                                 )}`}
                             >
                                 <PlayerBox
+                                    key={index}
                                     player={player}
                                     index={index}
                                     showCommanderDamage={showCommanderDamage}
                                     setShowCommanderDamage={
                                         setShowCommanderDamage
                                     }
+                                    openCommanderSearch={setShowCommanderSearch}
                                 />
                             </div>
                         ))}
@@ -849,12 +789,135 @@ const App = () => {
                         </div>
                     </div>
                 )}
+                {console.log("showCommanderSearch =", showCommanderSearch)}
+                {/* Commander Search Modal */}
+                {showCommanderSearch !== null && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-start justify-center animate-fade-in z-50 overflow-y-auto">
+                        <div className="bg-gray-800 mt-8 p-6 rounded-xl w-11/12 max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
+                            {/* Header */}
+                            <div className="flex justify-between items-center mb-4">
+                                <h3 className="font-mtg text-xl text-white">
+                                    Search Commander
+                                </h3>
+                                <button
+                                    onClick={() => {
+                                        setShowCommanderSearch(null);
+                                        setCommanderSearch("");
+                                        setSearchResults([]);
+                                    }}
+                                    className="text-white text-xl"
+                                >
+                                    <i className="fas fa-times" />
+                                </button>
+                            </div>
+
+                            {/* Input */}
+                            <input
+                                type="text"
+                                value={commanderSearch}
+                                onChange={(e) =>
+                                    setCommanderSearch(e.target.value)
+                                }
+                                placeholder="Search Commander..."
+                                className="w-full p-3 rounded-lg bg-gray-700 text-white mb-4"
+                                autoFocus
+                            />
+
+                            {/* Results (always visible, scrollable) */}
+                            <div className="flex-1 overflow-y-auto">
+                                {isSearching ? (
+                                    <div className="text-center text-white">
+                                        Searching...
+                                    </div>
+                                ) : searchResults.length > 0 ? (
+                                    <div className="space-y-2">
+                                        {searchResults.map((card) => (
+                                            <button
+                                                key={card.id}
+                                                onClick={() => {
+                                                    gameActions.updateCommander(
+                                                        showCommanderSearch,
+                                                        card
+                                                    );
+                                                    setShowCommanderSearch(
+                                                        null
+                                                    );
+                                                    setCommanderSearch("");
+                                                    setSearchResults([]);
+                                                }}
+                                                className="w-full p-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-left text-white flex items-center gap-3"
+                                            >
+                                                {card.image_uris?.small && (
+                                                    <img
+                                                        src={
+                                                            card.image_uris
+                                                                .small
+                                                        }
+                                                        alt={card.name}
+                                                        className="w-12 h-12 rounded object-cover"
+                                                    />
+                                                )}
+                                                <div>
+                                                    <div className="font-mtg">
+                                                        {card.name}
+                                                    </div>
+                                                    <div className="text-sm text-gray-300">
+                                                        {card.type_line}
+                                                    </div>
+                                                </div>
+                                            </button>
+                                        ))}
+                                    </div>
+                                ) : commanderSearch ? (
+                                    <div className="text-center text-gray-400">
+                                        No results found
+                                    </div>
+                                ) : (
+                                    <div className="text-center text-gray-400">
+                                        Start typing to search for a commander.
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                )}
+
+                {/* Reset Confirmation Modal */}
+                {showResetConfirm && (
+                    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center animate-fade-in z-50">
+                        <div className="bg-gray-800 p-8 rounded-xl shadow-lg text-center">
+                            <h3 className="text-2xl font-mtg text-white mb-4">
+                                Reset Game?
+                            </h3>
+                            <p className="text-white mb-6">
+                                Are you sure? This will end the current game and
+                                return to the main menu.
+                            </p>
+                            <div className="flex gap-4 justify-center">
+                                <button
+                                    onClick={() => {
+                                        setGameState(null);
+                                        setStartingLife(null);
+                                        setShowCommanderDamage(null);
+                                        setShowResetConfirm(false);
+                                    }}
+                                    className="bg-red-500 hover:bg-red-600 text-white px-6 py-3 rounded-xl font-mtg transition-colors"
+                                >
+                                    Yes, Reset
+                                </button>
+                                <button
+                                    onClick={() => setShowResetConfirm(false)}
+                                    className="bg-gray-600 hover:bg-gray-700 text-white px-6 py-3 rounded-xl font-mtg transition-colors"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 <button
-                    onClick={() => {
-                        setGameState(null);
-                        setStartingLife(null);
-                        setShowCommanderDamage(null);
-                    }}
+                    onClick={() => setShowResetConfirm(true)}
                     className="bg-red-500 px-6 py-3 rounded-xl text-2xl animate-slide-up w-full max-w-7xl"
                 >
                     Reset Game
